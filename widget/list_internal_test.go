@@ -445,7 +445,7 @@ func TestList_Unselect(t *testing.T) {
 	list.Unselect(10)
 	children = list.scroller.Content.(*fyne.Container).Layout.(*listLayout).children
 	assert.False(t, children[10].(*listItem).background.Visible())
-	assert.Nil(t, list.selected)
+	assert.Empty(t, list.selected)
 	assert.Equal(t, 10, unselected)
 
 	unselected = -1
