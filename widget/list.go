@@ -310,9 +310,9 @@ func (l *List) Highlight(id ListItemID) {
 // Select puts the item identified by the given ID into the selection unless
 // MultiSelect is true, in which case the ID is added to the selection.
 func (l *List) Select(id ListItemID) {
-	oldIds := l.selected
-	for _, oldId := range oldIds {
-		if oldId == id {
+	oldIDs := l.selected
+	for _, oldID := range oldIDs {
+		if oldID == id {
 			return
 		}
 	}
@@ -323,12 +323,12 @@ func (l *List) Select(id ListItemID) {
 	if !l.MultiSelect {
 		l.selected = []ListItemID{id}
 	} else {
-		l.selected = append(oldIds, id)
+		l.selected = append(oldIDs, id)
 	}
 	defer func() {
-		if f := l.OnUnselected; f != nil && len(oldIds) > 0 && !l.MultiSelect {
-			for _, oldId := range oldIds {
-				f(oldId)
+		if f := l.OnUnselected; f != nil && len(oldIDs) > 0 && !l.MultiSelect {
+			for _, oldID := range oldIDs {
+				f(oldID)
 			}
 		}
 		if f := l.OnSelected; f != nil {
@@ -348,7 +348,7 @@ func (l *List) SelectAll() {
 		return
 	}
 
-	oldIds := l.selected
+	oldIDs := l.selected
 	l.selected = make([]ListItemID, length)
 	for i := range l.selected {
 		l.selected[i] = i
@@ -361,9 +361,9 @@ func (l *List) SelectAll() {
 		return
 	}
 
-	wasSel := make(map[ListItemID]struct{}, len(oldIds))
-	for _, oldId := range oldIds {
-		wasSel[oldId] = struct{}{}
+	wasSel := make(map[ListItemID]struct{}, len(oldIDs))
+	for _, oldID := range oldIDs {
+		wasSel[oldID] = struct{}{}
 	}
 	for id := ListItemID(0); id < ListItemID(length); id++ {
 		if _, exists := wasSel[id]; !exists {
@@ -391,15 +391,15 @@ func (l *List) SetSelection(ids []ListItemID) {
 		wasSel[id] = struct{}{}
 	}
 
-	newIds := make([]ListItemID, 0, len(ids))
+	newIDs := make([]ListItemID, 0, len(ids))
 	newSel := make(map[ListItemID]struct{}, len(ids))
 	for _, id := range ids {
 		if id >= 0 && id < length {
-			newIds = append(newIds, id)
+			newIDs = append(newIDs, id)
 			newSel[id] = struct{}{}
 		}
 	}
-	l.selected = newIds
+	l.selected = newIDs
 	l.Refresh()
 
 	// Call OnSelected, OnUnselected callbacks for each newly (un)selected item
@@ -548,11 +548,11 @@ func (l *List) UnselectAll() {
 		return
 	}
 
-	oldIds := l.selected
+	oldIDs := l.selected
 	l.selected = nil
 	l.Refresh()
 	if f := l.OnUnselected; f != nil {
-		for _, id := range oldIds {
+		for _, id := range oldIDs {
 			f(id)
 		}
 	}
