@@ -72,6 +72,11 @@ type List struct {
 	// Since: 2.8
 	OnHighlighted func(id ListItemID) `json:"-"`
 
+	// MuliSelect enables selection of multiple items
+	//
+	// Since: 2.9
+	MultiSelect bool
+
 	currentHighlight ListItemID
 	focused          bool
 	scroller         *widget.Scroll
@@ -302,23 +307,29 @@ func (l *List) Highlight(id ListItemID) {
 	l.Refresh()
 }
 
-// Select add the item identified by the given ID to the selection.
+// Select puts the item identified by the given ID into the selection unless
+// MultiSelect is true, in which case the ID is added to the selection.
 func (l *List) Select(id ListItemID) {
-	if len(l.selected) > 0 && id == l.selected[0] {
-		return
+	oldIds := l.selected
+	for _, oldId := range oldIds {
+		if oldId == id {
+			return
+		}
 	}
-	length := 0
-	if f := l.Length; f != nil {
-		length = f()
-	}
+	length := l.length()
 	if id < 0 || id >= length {
 		return
 	}
-	old := l.selected
-	l.selected = []ListItemID{id}
+	if !l.MultiSelect {
+		l.selected = []ListItemID{id}
+	} else {
+		l.selected = append(oldIds, id)
+	}
 	defer func() {
-		if f := l.OnUnselected; f != nil && len(old) > 0 {
-			f(old[0])
+		if f := l.OnUnselected; f != nil && len(oldIds) > 0 && !l.MultiSelect {
+			for _, oldId := range oldIds {
+				f(oldId)
+			}
 		}
 		if f := l.OnSelected; f != nil {
 			f(id)
@@ -328,14 +339,92 @@ func (l *List) Select(id ListItemID) {
 	l.Refresh()
 }
 
+// SelectAll selects all items in the list.
+//
+// Since: 2.9
+func (l *List) SelectAll() {
+	length := l.length()
+	if length == 0 || length == len(l.selected) {
+		return
+	}
+
+	oldIds := l.selected
+	l.selected = make([]ListItemID, length)
+	for i := range l.selected {
+		l.selected[i] = i
+	}
+	l.Refresh()
+
+	// Call OnSelected callback for each newly selected item
+	onSelected := l.OnSelected
+	if onSelected == nil {
+		return
+	}
+
+	wasSel := make(map[ListItemID]struct{}, len(oldIds))
+	for _, oldId := range oldIds {
+		wasSel[oldId] = struct{}{}
+	}
+	for id := ListItemID(0); id < ListItemID(length); id++ {
+		if _, exists := wasSel[id]; !exists {
+			onSelected(id)
+		}
+	}
+}
+
+// SetSelection sets the currently selected items in the list when in MultiSelect mode,
+// otherwise selects the first item given, or clear the selection when empty.
+//
+// Since: 2.9
+func (l *List) SetSelection(ids []ListItemID) {
+	if !l.MultiSelect && len(ids) > 0 {
+		ids = []ListItemID{ids[0]}
+	}
+
+	length := l.length()
+	if length == 0 {
+		return
+	}
+
+	wasSel := make(map[ListItemID]struct{}, len(l.selected))
+	for _, id := range l.selected {
+		wasSel[id] = struct{}{}
+	}
+
+	newIds := make([]ListItemID, 0, len(ids))
+	newSel := make(map[ListItemID]struct{}, len(ids))
+	for _, id := range ids {
+		if id >= 0 && id < length {
+			newIds = append(newIds, id)
+			newSel[id] = struct{}{}
+		}
+	}
+	l.selected = newIds
+	l.Refresh()
+
+	// Call OnSelected, OnUnselected callbacks for each newly (un)selected item
+	onSelected := l.OnSelected
+	onUnselected := l.OnUnselected
+	if onSelected == nil && onUnselected == nil {
+		return
+	}
+
+	for id := ListItemID(0); id < ListItemID(length); id++ {
+		_, wasSelected := wasSel[id]
+		_, newSelected := newSel[id]
+		if wasSelected && !newSelected && onUnselected != nil {
+			onUnselected(id)
+		} else if newSelected && !wasSelected && onSelected != nil {
+			onSelected(id)
+		}
+	}
+}
+
 // ScrollTo scrolls to the item represented by id
 //
 // Since: 2.1
 func (l *List) ScrollTo(id ListItemID) {
-	length := 0
-	if f := l.Length; f != nil {
-		length = f()
-	}
+	length := l.length()
 	if id < 0 || id >= length {
 		return
 	}
@@ -426,12 +515,26 @@ func (l *List) TypedRune(_ rune) {
 
 // Unselect removes the item identified by the given ID from the selection.
 func (l *List) Unselect(id ListItemID) {
-	if len(l.selected) == 0 || l.selected[0] != id {
+	isSel := false
+	for _, selID := range l.selected {
+		if selID == id {
+			isSel = true
+			break
+		}
+	}
+	if !isSel {
 		return
 	}
 
-	l.selected = nil
+	newSel := make([]ListItemID, 0, len(l.selected)-1)
+	for _, selID := range l.selected {
+		if selID != id {
+			newSel = append(newSel, selID)
+		}
+	}
+	l.selected = newSel
 	l.Refresh()
+
 	if f := l.OnUnselected; f != nil {
 		f(id)
 	}
@@ -445,14 +548,21 @@ func (l *List) UnselectAll() {
 		return
 	}
 
-	selected := l.selected
+	oldIds := l.selected
 	l.selected = nil
 	l.Refresh()
 	if f := l.OnUnselected; f != nil {
-		for _, id := range selected {
+		for _, id := range oldIds {
 			f(id)
 		}
 	}
+}
+
+func (l *List) length() int {
+	if f := l.Length; f != nil {
+		return f()
+	}
+	return 0
 }
 
 // Refresh causes this List to be redrawn in its current state
@@ -470,7 +580,7 @@ func (l *List) contentMinSize() fyne.Size {
 	if l.Length == nil {
 		return fyne.NewSize(0, 0)
 	}
-	items := l.Length()
+	items := l.length()
 
 	if len(l.itemHeights) == 0 {
 		return fyne.NewSize(l.itemMin.Width,
@@ -798,7 +908,6 @@ func (l *listLayout) setupListItem(li *listItem, id ListItemID, focus bool) {
 
 			l.list.currentHighlight = id
 		}
-
 		l.list.Select(id)
 	}
 }
@@ -807,10 +916,7 @@ func (l *listLayout) updateList(newOnly bool) {
 	th := l.list.Theme()
 	separatorThickness := th.Size(theme.SizeNamePadding)
 	width := l.list.Size().Width
-	length := 0
-	if f := l.list.Length; f != nil {
-		length = f()
-	}
+	length := l.list.length()
 	if l.list.UpdateItem == nil {
 		fyne.LogError("Missing UpdateCell callback required for List", nil)
 	}

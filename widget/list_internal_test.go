@@ -364,6 +364,72 @@ func TestList_Select(t *testing.T) {
 	assert.True(t, visible6.background.Visible())
 }
 
+func TestList_MultiSelect(t *testing.T) {
+	list := createList(1000)
+	list.MultiSelect = true
+
+	assert.Equal(t, float32(0), list.offsetY)
+	list.Select(50)
+	assert.Equal(t, 988, int(list.offsetY))
+	lo := list.scroller.Content.(*fyne.Container).Layout.(*listLayout)
+	visible50, _ := lo.searchVisible(lo.visible, 50)
+	assert.Equal(t, visible50.background.FillColor, theme.Color(theme.ColorNameSelection))
+	assert.True(t, visible50.background.Visible())
+
+	list.Select(5)
+	assert.Equal(t, 195, int(list.offsetY))
+	visible5, _ := lo.searchVisible(lo.visible, 5)
+	assert.Equal(t, visible5.background.FillColor, theme.Color(theme.ColorNameSelection))
+	assert.True(t, visible5.background.Visible())
+
+	list.Select(6)
+	assert.Equal(t, 195, int(list.offsetY))
+	visible5, _ = lo.searchVisible(lo.visible, 5)
+	visible6, _ := lo.searchVisible(lo.visible, 6)
+	assert.True(t, visible5.background.Visible())
+	assert.Equal(t, visible6.background.FillColor, theme.Color(theme.ColorNameSelection))
+	assert.True(t, visible6.background.Visible())
+
+	list.SetSelection([]ListItemID{6, 7, 8})
+	assert.Equal(t, 195, int(list.offsetY))
+	visible7, _ := lo.searchVisible(lo.visible, 7)
+	visible8, _ := lo.searchVisible(lo.visible, 8)
+	assert.False(t, visible5.background.Visible())
+	assert.True(t, visible6.background.Visible())
+	assert.Equal(t, visible7.background.FillColor, theme.Color(theme.ColorNameSelection))
+	assert.Equal(t, visible8.background.FillColor, theme.Color(theme.ColorNameSelection))
+	assert.True(t, visible7.background.Visible())
+	assert.True(t, visible8.background.Visible())
+
+	count := 0
+	list.OnSelected = func(id ListItemID) {
+		count++
+	}
+	list.SelectAll()
+	assert.Equal(t, 195, int(list.offsetY))
+	assert.True(t, visible5.background.Visible())
+	assert.True(t, visible6.background.Visible())
+	assert.True(t, visible7.background.Visible())
+	assert.True(t, visible8.background.Visible())
+	assert.Equal(t, visible5.background.FillColor, theme.Color(theme.ColorNameSelection))
+	assert.Equal(t, visible6.background.FillColor, theme.Color(theme.ColorNameSelection))
+	assert.Equal(t, visible7.background.FillColor, theme.Color(theme.ColorNameSelection))
+	assert.Equal(t, visible8.background.FillColor, theme.Color(theme.ColorNameSelection))
+	assert.Equal(t, 1000-3, count)
+
+	count = 0
+	list.OnUnselected = func(id ListItemID) {
+		count++
+	}
+	list.UnselectAll()
+	assert.Equal(t, 195, int(list.offsetY))
+	assert.False(t, visible5.background.Visible())
+	assert.False(t, visible6.background.Visible())
+	assert.False(t, visible7.background.Visible())
+	assert.False(t, visible8.background.Visible())
+	assert.Equal(t, 1000, count)
+}
+
 func TestList_Unselect(t *testing.T) {
 	list := createList(1000)
 	var unselected ListItemID
