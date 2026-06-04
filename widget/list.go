@@ -934,7 +934,7 @@ func (l *listLayout) setupListItem(li *listItem, id ListItemID, focus bool) {
 
 			l.list.currentHighlight = id
 		}
-		if isModifierPressed(fyne.KeyModifierSuper|fyne.KeyModifierControl) {
+		if isModifierPressed(fyne.KeyModifierSuper | fyne.KeyModifierControl) {
 			if li.selected {
 				l.list.Unselect(id)
 			} else {
