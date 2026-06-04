@@ -307,8 +307,7 @@ func (l *List) Highlight(id ListItemID) {
 	l.Refresh()
 }
 
-// Select puts the item identified by the given ID into the selection unless
-// MultiSelect is true, in which case the ID is added to the selection.
+// Select puts the item identified by the given ID into the selection.
 func (l *List) Select(id ListItemID) {
 	oldIDs := l.selected
 	for _, oldID := range oldIDs {
