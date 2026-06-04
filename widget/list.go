@@ -320,11 +320,7 @@ func (l *List) Select(id ListItemID) {
 	if id < 0 || id >= length {
 		return
 	}
-	if !l.MultiSelect {
-		l.selected = []ListItemID{id}
-	} else {
-		l.selected = append(oldIDs, id)
-	}
+	l.selected = []ListItemID{id}
 	defer func() {
 		if f := l.OnUnselected; f != nil && len(oldIDs) > 0 && !l.MultiSelect {
 			for _, oldID := range oldIDs {
@@ -476,29 +472,47 @@ func (l *List) GetScrollOffset() float32 {
 	return l.offsetY
 }
 
+func isModifierPressed(mod fyne.KeyModifier) bool {
+	d, ok := fyne.CurrentApp().Driver().(desktop.Driver)
+	if ok && d.CurrentKeyModifiers()&mod > 0 {
+		return true
+	}
+	return false
+}
+
 // TypedKey is called if a key event happens while this List is focused.
 func (l *List) TypedKey(event *fyne.KeyEvent) {
 	oldFocus := l.currentHighlight
 
+	scrollOrSelect := func() {
+		if isModifierPressed(fyne.KeyModifierShift) {
+			l.SetSelection(rangeSelectionIds(l.currentHighlight, l.selected))
+		}
+		l.scrollTo(l.currentHighlight)
+		l.RefreshItem(l.currentHighlight)
+	}
+
 	switch event.Name {
 	case fyne.KeySpace:
-		l.Select(l.currentHighlight)
+		if isModifierPressed(fyne.KeyModifierShift) {
+			l.SetSelection(rangeSelectionIds(l.currentHighlight, l.selected))
+		} else {
+			l.Select(l.currentHighlight)
+		}
 	case fyne.KeyDown:
 		if f := l.Length; f != nil && l.currentHighlight >= f()-1 {
 			return
 		}
 		l.RefreshItem(l.currentHighlight)
 		l.currentHighlight++
-		l.scrollTo(l.currentHighlight)
-		l.RefreshItem(l.currentHighlight)
+		scrollOrSelect()
 	case fyne.KeyUp:
 		if l.currentHighlight <= 0 {
 			return
 		}
 		l.RefreshItem(l.currentHighlight)
 		l.currentHighlight--
-		l.scrollTo(l.currentHighlight)
-		l.RefreshItem(l.currentHighlight)
+		scrollOrSelect()
 	}
 
 	if oldFocus != l.currentHighlight {
@@ -718,6 +732,7 @@ type listItem struct {
 	BaseWidget
 
 	onTapped          func()
+	onTappedSecondary func() // used instead of tapped+modifier for multi-select
 	onHovered         func()
 	background        *canvas.Rectangle
 	child             fyne.CanvasObject
@@ -780,6 +795,17 @@ func (li *listItem) Tapped(*fyne.PointEvent) {
 		li.selected = true
 		li.Refresh()
 		li.onTapped()
+	}
+}
+
+func (li *listItem) TappedSecondary(*fyne.PointEvent) {
+	if !fyne.CurrentDevice().IsMobile() {
+		return
+	}
+	if f := li.onTappedSecondary; f != nil {
+		li.selected = true
+		li.Refresh()
+		f()
 	}
 }
 
@@ -908,8 +934,63 @@ func (l *listLayout) setupListItem(li *listItem, id ListItemID, focus bool) {
 
 			l.list.currentHighlight = id
 		}
-		l.list.Select(id)
+		if isModifierPressed(fyne.KeyModifierSuper|fyne.KeyModifierControl) {
+			if li.selected {
+				l.list.Unselect(id)
+			} else {
+				l.list.Select(id)
+			}
+		} else if isModifierPressed(fyne.KeyModifierShift) {
+			l.list.SetSelection(rangeSelectionIds(id, l.list.selected))
+		} else {
+			l.list.Select(id)
+		}
 	}
+	if !fyne.CurrentDevice().IsMobile() {
+		return
+	}
+	li.onTappedSecondary = func() {
+		if li.selected {
+			l.list.Unselect(id)
+		} else {
+			l.list.SetSelection(append(l.list.selected, id))
+		}
+	}
+}
+
+func rangeSelectionIds(cur ListItemID, selected []ListItemID) []ListItemID {
+	var high, low ListItemID = math.MinInt, math.MaxInt
+	for _, id := range selected {
+		if id > high {
+			high = id
+		}
+		if id < low {
+			low = id
+		}
+	}
+
+	if len(selected) == 0 {
+		low = cur
+		high = cur
+	}
+
+	if cur < low {
+		r := make([]ListItemID, 0, (low-cur)+len(selected))
+		for id := cur; id <= low; id++ {
+			r = append(r, id)
+		}
+		r = append(r, selected[1:]...)
+		return r
+	}
+
+	r := make([]ListItemID, 0, (cur-high)+len(selected))
+	if len(selected) > 0 {
+		r = append(r, selected[:len(selected)-1]...)
+	}
+	for id := high; id <= cur; id++ {
+		r = append(r, id)
+	}
+	return r
 }
 
 func (l *listLayout) updateList(newOnly bool) {

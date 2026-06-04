@@ -430,6 +430,20 @@ func TestList_MultiSelect(t *testing.T) {
 	assert.Equal(t, 1000, count)
 }
 
+func TestList_rangeSelectionIds(t *testing.T) {
+	selected := []ListItemID{2}
+	assert.Equal(t, []ListItemID{2}, rangeSelectionIds(2, selected))
+	assert.Equal(t, []ListItemID{0,1,2}, rangeSelectionIds(0, selected))
+	assert.Equal(t, []ListItemID{2,3,4}, rangeSelectionIds(4, selected))
+	selected = []ListItemID{2,3,4}
+	assert.Equal(t, []ListItemID{1,2,3,4}, rangeSelectionIds(1, selected))
+	assert.Equal(t, []ListItemID{2,3,4,5}, rangeSelectionIds(5, selected))
+	assert.Equal(t, []ListItemID{2}, rangeSelectionIds(2, []ListItemID{}))
+	selected = []ListItemID{2,4,6}
+	assert.Equal(t, []ListItemID{2,4,6,7,8}, rangeSelectionIds(8, selected))
+	assert.Equal(t, []ListItemID{1,2,4,6}, rangeSelectionIds(1, selected))
+}
+
 func TestList_Unselect(t *testing.T) {
 	list := createList(1000)
 	var unselected ListItemID
