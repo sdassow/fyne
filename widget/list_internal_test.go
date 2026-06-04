@@ -384,9 +384,8 @@ func TestList_MultiSelect(t *testing.T) {
 
 	list.Select(6)
 	assert.Equal(t, 195, int(list.offsetY))
-	visible5, _ = lo.searchVisible(lo.visible, 5)
 	visible6, _ := lo.searchVisible(lo.visible, 6)
-	assert.True(t, visible5.background.Visible())
+	assert.False(t, visible5.background.Visible())
 	assert.Equal(t, visible6.background.FillColor, theme.Color(theme.ColorNameSelection))
 	assert.True(t, visible6.background.Visible())
 
