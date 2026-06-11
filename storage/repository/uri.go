@@ -3,7 +3,6 @@ package repository
 import (
 	"bufio"
 	"mime"
-	"net/url"
 	"path"
 	"strings"
 	"unicode/utf8"
@@ -33,15 +32,19 @@ func EqualURI(t1, t2 fyne.URI) bool {
 var _ fyne.URI = &uri{}
 
 type uri struct {
-	url.URL
+	scheme    string
+	authority string
+	path      string
+	query     string
+	fragment  string
 }
 
 func (u *uri) Extension() string {
-	return path.Ext(u.URL.Path)
+	return path.Ext(u.path)
 }
 
 func (u *uri) Name() string {
-	return path.Base(u.URL.Path)
+	return path.Base(u.path)
 }
 
 func (u *uri) MimeType() string {
@@ -69,28 +72,43 @@ func (u *uri) MimeType() string {
 }
 
 func (u *uri) Scheme() string {
-	return u.URL.Scheme
+	return u.scheme
 }
 
 func (u *uri) String() string {
-	return u.URL.String()
+	// NOTE: this string reconstruction is mandated by IETF RFC3986,
+	// section 5.3, pp. 35.
+	s := strings.Builder{}
+	s.Grow(len(u.scheme) + len(u.authority) + len(u.path) + len(u.query) + len(u.fragment) + len("://?#"))
+
+	s.WriteString(u.scheme)
+	s.WriteString("://")
+	s.WriteString(u.authority)
+	s.WriteString(u.path)
+
+	if len(u.query) > 0 {
+		s.WriteByte('?')
+		s.WriteString(u.query)
+	}
+	if len(u.fragment) > 0 {
+		s.WriteByte('#')
+		s.WriteString(u.fragment)
+	}
+	return s.String()
 }
 
 func (u *uri) Authority() string {
-	if u.URL.User != nil {
-		return u.URL.User.String() + "@" + u.URL.Host
-	}
-	return u.URL.Host
+	return u.authority
 }
 
 func (u *uri) Path() string {
-	return u.URL.Path
+	return u.path
 }
 
 func (u *uri) Query() string {
-	return u.URL.RawQuery
+	return u.query
 }
 
 func (u *uri) Fragment() string {
-	return u.URL.Fragment
+	return u.fragment
 }
