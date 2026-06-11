@@ -2,11 +2,10 @@ package repository
 
 import (
 	"errors"
+	"net/url"
 	"path/filepath"
 	"runtime"
 	"strings"
-
-	uriParser "github.com/fredbi/uri"
 
 	"fyne.io/fyne/v2"
 )
@@ -17,9 +16,6 @@ import (
 //
 // Since: 2.0
 func NewFileURI(path string) fyne.URI {
-	// escape characters for internal representation
-	path = filePathEscape(path)
-
 	// URIs are supposed to use forward slashes. On Windows, it
 	// should be OK to use the platform native filepath with UNIX
 	// or NT style paths, with / or \, but when we reconstruct
@@ -30,10 +26,10 @@ func NewFileURI(path string) fyne.URI {
 		path = filepath.ToSlash(path)
 	}
 
-	return &uri{
-		scheme: "file",
-		path:   path,
-	}
+	return &uri{url.URL{
+		Scheme: "file",
+		Path:   path,
+	}}
 }
 
 // ParseURI implements the back-end logic for storage.ParseURI, which you
@@ -64,8 +60,20 @@ func ParseURI(s string) (fyne.URI, error) {
 			path = path[2:]
 		}
 
+		p, err := url.PathUnescape(path)
+		if err != nil {
+			return nil, err
+		}
+
 		// Windows files can break authority checks, so just return the parsed file URI
-		return NewFileURI(path), nil
+		return NewFileURI(p), nil
+	}
+
+	if strings.EqualFold(scheme, "urn") {
+		return &uri{url.URL{
+			Scheme: scheme,
+			Path:   path,
+		}}, nil
 	}
 
 	scheme = strings.ToLower(scheme)
@@ -79,39 +87,10 @@ func ParseURI(s string) (fyne.URI, error) {
 
 	// There was no repository registered, or it did not provide a parser
 
-	l, err := uriParser.Parse(s)
+	l, err := url.Parse(s)
 	if err != nil {
 		return nil, err
 	}
 
-	authority := l.Authority()
-	authBuilder := strings.Builder{}
-	authBuilder.Grow(len(authority.UserInfo()) + len(authority.Host()) + len(authority.Port()) + len("@[]:"))
-
-	if userInfo := authority.UserInfo(); userInfo != "" {
-		authBuilder.WriteString(userInfo)
-		authBuilder.WriteByte('@')
-	}
-
-	// Per RFC 3986, section 3.2.2, IPv6 addresses must be enclosed in square brackets.
-	if host := authority.Host(); strings.Contains(host, ":") {
-		authBuilder.WriteByte('[')
-		authBuilder.WriteString(host)
-		authBuilder.WriteByte(']')
-	} else {
-		authBuilder.WriteString(host)
-	}
-
-	if port := authority.Port(); port != "" {
-		authBuilder.WriteByte(':')
-		authBuilder.WriteString(port)
-	}
-
-	return &uri{
-		scheme:    scheme,
-		authority: authBuilder.String(),
-		path:      authority.Path(),
-		query:     l.Query().Encode(),
-		fragment:  l.Fragment(),
-	}, nil
+	return &uri{*l}, nil
 }
