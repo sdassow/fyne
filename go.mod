@@ -8,7 +8,6 @@ require (
 	github.com/FyshOS/fancyfs v0.0.0-20251025194026-1f03098ff624
 	github.com/anthonynsimon/bild v0.13.0
 	github.com/fogleman/gg v1.3.0
-	github.com/fredbi/uri v1.1.1
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/fyne-io/gl-js v0.2.1-0.20260315212741-029c47fd27e8
 	github.com/fyne-io/glfw-js v0.3.0
